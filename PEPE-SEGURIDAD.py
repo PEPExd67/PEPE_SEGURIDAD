@@ -5,13 +5,14 @@ from flask import Flask
 from threading import Thread
 
 # ==========================================
-# 1. SERVIDOR WEB (PARA MANTENER RENDER VIVO)
+# 1. SERVIDOR MANTENIMIENTO (FLASK)
 # ==========================================
+# Esto engaña a Render para que crea que es una web y no apague el bot
 app = Flask('')
 
 @app.route('/')
 def home():
-    return "✅ SISTEMA KUSANAGI ONLINE"
+    return "✅ SISTEMA KUSANAGI ESTÁ OPERATIVO"
 
 def run():
     # Render usa el puerto 8080 por defecto
@@ -19,15 +20,15 @@ def run():
 
 def keep_alive():
     t = Thread(target=run)
+    t.daemon = True
     t.start()
 
 # ==========================================
 # 2. CONFIGURACIÓN DEL BOT
 # ==========================================
 
-# --- AGREGA TU TOKEN AQUÍ ---
-# Si prefieres seguridad total, usa: TOKEN = os.getenv('DISCORD_TOKEN')
-TOKEN = 'MTUwMTQ1OTY0ODQ2Nzk2Mzk0NA.G3kEgC.r3-Y5wXFU8C9LiiwsoxvAIJmfnuWDL7e3DQplU' 
+# Aquí el código busca la variable que configuraste en Render
+TOKEN = os.getenv('DISCORD_TOKEN')
 
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="!", intents=intents)
@@ -40,13 +41,11 @@ async def on_ready():
 @bot.command(name="Seguridad")
 @commands.is_owner() 
 async def activar_seguridad(ctx):
-    """Solo Pepe puede activar este protocolo"""
     embed = discord.Embed(
         title="⛩️ PROTOCOLO DE SEGURIDAD KUSANAGI",
         description=(
             f"### 👋 ¡Hola {ctx.author.name}!\n"
-            "El sistema ha verificado tu identidad como **Dueño del Servidor**.\n\n"
-            "El panel de verificación para los usuarios ya está listo abajo."
+            "Identidad verificada como **Dueño**. El panel de acceso está listo."
         ),
         color=0x00ff00
     )
@@ -57,11 +56,13 @@ async def activar_seguridad(ctx):
     async def verify_callback(interaction):
         role = discord.utils.get(interaction.guild.roles, name="Verificado")
         if not role:
-            # Crea el rol si no existe
             role = await interaction.guild.create_role(name="Verificado", color=discord.Color.green())
         
-        await interaction.user.add_roles(role)
-        await interaction.response.send_message("✅ Has sido verificado por el sistema de Pepe.", ephemeral=True)
+        if role in interaction.user.roles:
+            await interaction.response.send_message("⚠️ Ya estás verificado.", ephemeral=True)
+        else:
+            await interaction.user.add_roles(role)
+            await interaction.response.send_message("✅ Verificado por el sistema de Pepe.", ephemeral=True)
 
     button.callback = verify_callback
     view.add_item(button)
@@ -70,13 +71,15 @@ async def activar_seguridad(ctx):
 @activar_seguridad.error
 async def seguridad_error(ctx, error):
     if isinstance(error, commands.NotOwner):
-        await ctx.send("🚫 **ERROR DE SEGURIDAD:** Solo el dueño del bot tiene acceso a este comando.", delete_after=10)
+        await ctx.send("🚫 **ACCESO DENEGADO:** Solo el dueño tiene permisos.", delete_after=10)
 
 # ==========================================
-# 3. EJECUCIÓN DEL SISTEMA
+# 3. LANZAMIENTO
 # ==========================================
 if __name__ == "__main__":
-    print("Iniciando servidor de mantenimiento...")
-    keep_alive()  # Lanza Flask en un hilo separado
-    print("Conectando con Discord...")
-    bot.run(TOKEN)
+    if TOKEN is None:
+        print("❌ ERROR: No se encontró DISCORD_TOKEN en la pestaña Environment de Render.")
+    else:
+        keep_alive() # Inicia la "web" para Render
+        print("Conectando con Discord...")
+        bot.run(TOKEN)
